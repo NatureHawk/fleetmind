@@ -1,0 +1,40 @@
+name: fleetmind
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fleetmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fleetmind}
+      POSTGRES_DB: ${POSTGRES_DB:-fleetmind}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fleetmind} -d ${POSTGRES_DB:-fleetmind}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      FLEETMIND_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fleetmind}:${POSTGRES_PASSWORD:-fleetmind}@db:5432/${POSTGRES_DB:-fleetmind}
+      FLEETMIND_DATABASE_FALLBACK_URL: ""
+      FLEETMIND_EXPERIMENT_WORKERS: ${FLEETMIND_EXPERIMENT_WORKERS:-4}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+
+volumes:
+  pgdata:
